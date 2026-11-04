@@ -1,0 +1,11 @@
+.env
+*.log
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+secrets/
+
+# Reference corpus: copyrighted/redistribution-sensitive raw text (re-fetch with scripts/fetch_sources.py)
+knowledge_base/sources/*/raw.*
