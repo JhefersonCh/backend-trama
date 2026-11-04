@@ -1,0 +1,276 @@
+-- Rule set v3 (source: rules/diagnostico_red.v3.yaml): v2 + H6-H10, facts, rules, guides. Also enables LLM fact extraction fallback.
+-- Idempotent: inserted once (next free version, matched by content) and activated (others deactivated).
+WITH src(y) AS (VALUES ($yaml$version: 3
+name: diagnostico_red
+# v3 = v2 + hechos/hipótesis/reglas/guías H6-H10 (IP duplicada, enlace ethernet, AP caído, congestión Wi-Fi, LAN).
+# v2 = v1 + `ui` por acción (componente que muestra el chat), R5 0.4 → 0.5 (H2 puede llegar a 0.8 con R2+R5)
+# y definiciones de las guías que los planes ya nombraban (guide_cambiar_dns, guide_acercarse_o_5ghz, guide_reingresar_clave).
+
+facts:                       # catálogo: el extractor SOLO puede producir estas keys/valores
+  luz_modem:          {type: enum, values: [roja, naranja, apagada, verde, parpadea, desconocida]}
+  luz_tras_reinicio:  {type: enum, values: [roja, normal, desconocida]}
+  otros_equipos_navegan: {type: bool}
+  reinicio_hecho:     {type: bool}
+  ip_apipa:           {type: bool}        # 169.254.x.x
+  navega_por_ip:      {type: bool}        # de browser_connectivity_check (fase 2)
+  resuelve_nombres:   {type: bool}
+  senal_wifi_pct:     {type: int}
+  funciona_por_cable: {type: bool}
+  clave_cambiada:     {type: bool}
+  error_contrasena:   {type: bool}
+  caida_reportada_zona: {type: bool}      # outage_check (fase 5) o tabla demo
+  zona:               {type: string}
+  modalidad:          {type: enum, values: [remoto, visita]}
+  franja:             {type: enum, values: [manana, tarde, noche, cualquiera]}
+  conflicto_ip:       {type: bool}
+  cable_desconectado: {type: bool}
+  ssid_visible:       {type: bool}
+  muchas_redes_vecinas: {type: bool}
+  banda:              {type: enum, values: [24ghz, 5ghz, desconocida]}
+  lento_horas_pico:   {type: bool}
+  perdida_paquetes_local: {type: bool}
+  latencia_alta_local: {type: bool}
+
+hypotheses:
+  H1_caida_proveedor:   {label: "Caída del proveedor o de la línea", category: connectivity, specialty: fibra}
+  H2_solo_dispositivo:  {label: "Problema solo de este dispositivo", category: dhcp, specialty: redes}
+  H3_dns:               {label: "Falla en la resolución de nombres (DNS)", category: dns, specialty: redes}
+  H4_wifi:              {label: "Señal o canal Wi-Fi deficiente", category: wifi, specialty: wifi}
+  H5_autenticacion:     {label: "Credenciales o seguridad del Wi-Fi", category: wifi, specialty: wifi}
+  H6_ip_duplicada:      {label: "Conflicto de dirección IP (IP duplicada)", category: dhcp, specialty: redes}
+  H7_enlace_ethernet:   {label: "Falla del cable o del puerto de red", category: ethernet, specialty: cableado}
+  H8_ap_caido:          {label: "Router o punto de acceso Wi-Fi apagado o caído", category: wifi, specialty: wifi}
+  H9_congestion_wifi:   {label: "Congestión o interferencia en el Wi-Fi", category: wifi, specialty: wifi}
+  H10_problema_lan:     {label: "Problema en la red local (LAN)", category: latency, specialty: redes}
+
+rules:                       # encadenamiento hacia adelante: si 'when' se cumple → aplicar 'cf' a la hipótesis
+  - {id: R1,  when: {otros_equipos_navegan: false},            then: {H1_caida_proveedor: +0.5, H2_solo_dispositivo: -0.8}}
+  - {id: R2,  when: {otros_equipos_navegan: true},             then: {H2_solo_dispositivo: +0.6, H1_caida_proveedor: -0.8}}
+  - {id: R3,  when: {luz_modem: [roja, naranja]},              then: {H1_caida_proveedor: +0.6}}
+  - {id: R4,  when: {luz_tras_reinicio: roja},                 then: {H1_caida_proveedor: +0.3}}
+  - {id: R5,  when: {ip_apipa: true},                          then: {H2_solo_dispositivo: +0.5}}
+  - {id: R6,  when: {navega_por_ip: true, resuelve_nombres: false}, then: {H3_dns: +0.8}}
+  - {id: R7,  when: {navega_por_ip: false},                    then: {H3_dns: -0.7}}
+  - {id: R8,  when: {senal_wifi_pct: "<50"},                   then: {H4_wifi: +0.6}}
+  - {id: R9,  when: {funciona_por_cable: true},                then: {H4_wifi: +0.5}}
+  - {id: R10, when: {error_contrasena: true},                  then: {H5_autenticacion: +0.7}}
+  - {id: R11, when: {clave_cambiada: false},                   then: {H5_autenticacion: -0.5}}
+  - {id: R12, when: {caida_reportada_zona: true},              then: {H1_caida_proveedor: +0.7}}
+  - {id: R13, when: {conflicto_ip: true},                      then: {H6_ip_duplicada: +0.8}}
+  - {id: R14, when: {cable_desconectado: true},                then: {H7_enlace_ethernet: +0.7}}
+  - {id: R15, when: {ssid_visible: false},                     then: {H8_ap_caido: +0.6}}
+  - {id: R16, when: {ssid_visible: false, otros_equipos_navegan: false}, then: {H8_ap_caido: +0.2}}
+  - {id: R17, when: {muchas_redes_vecinas: true},              then: {H9_congestion_wifi: +0.5}}
+  - {id: R18, when: {banda: 24ghz},                            then: {H9_congestion_wifi: +0.3}}
+  - {id: R19, when: {lento_horas_pico: true},                  then: {H9_congestion_wifi: +0.4}}
+  - {id: R20, when: {perdida_paquetes_local: true},            then: {H10_problema_lan: +0.6}}
+  - {id: R21, when: {latencia_alta_local: true},               then: {H10_problema_lan: +0.4}}
+
+actions:                     # costo (para la persona), ganancia por hipótesis y componente del chat (ui)
+  ask_otros_equipos:
+    kind: ask
+    fact: otros_equipos_navegan
+    cost: 1
+    gain: {H1_caida_proveedor: 0.8, H2_solo_dispositivo: 0.8}
+    autonomy: autonomo
+    ui: {component: quick_replies, options_from_fact: true,
+         question: "¿Los otros equipos de la casa (celulares, computadores) tienen internet?"}
+  ask_luz_modem:
+    kind: ask
+    fact: luz_modem
+    cost: 1
+    gain: {H1_caida_proveedor: 0.7}
+    autonomy: autonomo
+    ui: {component: quick_replies, options_from_fact: true,
+         question: "¿De qué color está la luz de internet del módem?"}
+  guide_reinicio:
+    kind: guided_step
+    sets: reinicio_hecho
+    verify_with: ask_luz_tras_reinicio
+    cost: 4
+    gain: {H1_caida_proveedor: 0.5}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Reiniciar el módem"
+      steps:
+        - "Desconecte el módem de la corriente."
+        - "Espere 30 segundos."
+        - "Vuelva a conectarlo y espere unos 2 minutos a que las luces se estabilicen."
+  ask_luz_tras_reinicio:
+    kind: ask
+    fact: luz_tras_reinicio
+    cost: 1
+    gain: {H1_caida_proveedor: 0.6}
+    autonomy: autonomo
+    ui: {component: quick_replies, options_from_fact: true,
+         question: "Después de reiniciar, ¿cómo quedó la luz de internet del módem?"}
+  guide_release_renew:
+    kind: guided_step
+    requires: {ip_apipa: true}
+    cost: 4
+    gain: {H2_solo_dispositivo: 0.5}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Pedir una dirección nueva al router"
+      steps:
+        - "Presione las teclas Windows + R, escriba cmd y presione Enter."
+        - "Escriba ipconfig /release y presione Enter (suelta la dirección actual)."
+        - "Escriba ipconfig /renew y presione Enter (pide una dirección nueva)."
+        - "Espere unos segundos y pruebe abrir una página."
+  ask_contrasena:
+    kind: ask
+    fact: error_contrasena
+    cost: 1
+    gain: {H5_autenticacion: 0.7}
+    autonomy: autonomo
+    ui: {component: quick_replies, options_from_fact: true,
+         question: "Al conectarse al Wi-Fi, ¿le aparece un mensaje de contraseña incorrecta?"}
+  guide_cambiar_dns:
+    kind: guided_step
+    requires: {resuelve_nombres: false}
+    cost: 3
+    gain: {H3_dns: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Cambiar el DNS del equipo"
+      steps:
+        - "Abra Configuración → Red e Internet → Opciones avanzadas del adaptador."
+        - "Haga clic derecho en su conexión → Propiedades → Protocolo de Internet versión 4 (TCP/IPv4) → Propiedades."
+        - "Elija «Usar las siguientes direcciones de servidor DNS» y escriba 8.8.8.8 y 1.1.1.1."
+        - "Acepte, cierre las ventanas y pruebe abrir una página."
+  guide_acercarse_o_5ghz:
+    kind: guided_step
+    requires: {funciona_por_cable: true}
+    cost: 2
+    gain: {H4_wifi: 0.5}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Mejorar la señal Wi-Fi"
+      steps:
+        - "Acérquese al router o quite lo que haya entre el equipo y el router."
+        - "Si ve una red con «5G» o «5GHz» en el nombre, conéctese a ella."
+        - "Pruebe de nuevo abrir una página."
+  guide_reingresar_clave:
+    kind: guided_step
+    requires: {error_contrasena: true}
+    cost: 2
+    gain: {H5_autenticacion: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Volver a conectarse al Wi-Fi"
+      steps:
+        - "En la lista de redes Wi-Fi del equipo, elija su red y toque «Olvidar»."
+        - "Vuelva a elegir su red y escriba la clave con cuidado (mayúsculas y minúsculas)."
+        - "Si no recuerda la clave, búsquela en la etiqueta que está debajo del router."
+  guide_ip_duplicada:
+    kind: guided_step
+    requires: {conflicto_ip: true}
+    cost: 3
+    gain: {H6_ip_duplicada: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Resolver el conflicto de dirección IP"
+      steps:
+        - "Presione Windows + R, escriba cmd y Enter; luego escriba ipconfig /release y Enter, y después ipconfig /renew y Enter."
+        - "Reinicie el router desconectándolo de la corriente 30 segundos."
+        - "Si el equipo tiene una IP fija configurada a mano, cámbiela a «Obtener dirección IP automáticamente»."
+        - "Pruebe abrir una página."
+  guide_revisar_cable:
+    kind: guided_step
+    requires: {cable_desconectado: true}
+    cost: 3
+    gain: {H7_enlace_ethernet: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Revisar el cable de red"
+      steps:
+        - "Desconecte y vuelva a conectar el cable en ambos extremos (equipo y router) hasta oír el «clic»."
+        - "Pruebe con otro puerto del router o con otro cable."
+        - "Revise que la lucecita junto al puerto de red esté encendida o parpadeando."
+        - "Si sigue igual, desactive y vuelva a activar el adaptador de red en Configuración."
+  guide_revisar_router_wifi:
+    kind: guided_step
+    requires: {ssid_visible: false}
+    cost: 3
+    gain: {H8_ap_caido: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Revisar que el router esté encendido"
+      steps:
+        - "Verifique que el router esté conectado a la corriente y que tenga luces encendidas."
+        - "Reinícielo: desconéctelo 30 segundos y vuelva a conectarlo; espere 2 minutos."
+        - "Revise que el botón de Wi-Fi del router (si tiene) esté activado."
+        - "Revise en la configuración del router que la banda Wi-Fi esté habilitada."
+  guide_congestion_wifi:
+    kind: guided_step
+    requires: {banda: 24ghz}
+    cost: 3
+    gain: {H9_congestion_wifi: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Mejorar un Wi-Fi congestionado"
+      steps:
+        - "Acérquese al router y quite obstáculos entre el equipo y el router."
+        - "Conéctese a la red de 5 GHz si está disponible."
+        - "En la configuración del router cambie el canal Wi-Fi a 1, 6 u 11."
+        - "Reinicie el router y pruebe de nuevo."
+  guide_problema_lan:
+    kind: guided_step
+    requires: {perdida_paquetes_local: true}
+    cost: 3
+    gain: {H10_problema_lan: 0.6}
+    may_resolve: true
+    autonomy: autonomo
+    ui:
+      component: checklist
+      title: "Revisar la red local"
+      steps:
+        - "Pruebe conectar el equipo por cable al router para comparar."
+        - "Reinicie el router: desconéctelo 30 segundos y vuelva a conectarlo."
+        - "Reduzca los equipos conectados y pause descargas o videos pesados."
+        - "Aleje el router de microondas, teléfonos inalámbricos u otras fuentes de interferencia."
+  # fase 2: tool_browser_connectivity_check {kind: client_tool, cost: 0, gain: {H3_dns: 0.9, H1_caida_proveedor: 0.5}}
+
+plans:                       # qué hacer cuando una hipótesis se ACEPTA (cf ≥ accept)
+  H1_caida_proveedor: [explain: H1, escalate_ticket]       # escalar con asignación (K2)
+  H2_solo_dispositivo: [guide_release_renew, verify, escalate_ticket_if_unresolved]
+  H3_dns:              [guide_cambiar_dns, verify, escalate_ticket_if_unresolved]
+  H4_wifi:             [guide_acercarse_o_5ghz, verify]
+  H5_autenticacion:    [guide_reingresar_clave, verify]
+  H6_ip_duplicada:     [guide_ip_duplicada, verify, escalate_ticket_if_unresolved]
+  H7_enlace_ethernet:  [guide_revisar_cable, verify, escalate_ticket_if_unresolved]
+  H8_ap_caido:         [guide_revisar_router_wifi, verify, escalate_ticket_if_unresolved]
+  H9_congestion_wifi:  [guide_congestion_wifi, verify, escalate_ticket_if_unresolved]
+  H10_problema_lan:    [guide_problema_lan, verify, escalate_ticket_if_unresolved]
+$yaml$))
+INSERT INTO rule_sets (name, version, content_yaml, is_active)
+SELECT 'diagnostico_red', COALESCE((SELECT max(version) FROM rule_sets WHERE name = 'diagnostico_red'), 0) + 1, src.y, false
+FROM src
+WHERE NOT EXISTS (SELECT 1 FROM rule_sets r WHERE r.name = 'diagnostico_red' AND r.content_yaml = src.y);
+
+UPDATE rule_sets SET is_active = false
+WHERE name = 'diagnostico_red' AND is_active
+  AND version <> (SELECT max(version) FROM rule_sets WHERE name = 'diagnostico_red' AND content_yaml LIKE 'version: 3' || chr(10) || '%');
+UPDATE rule_sets SET is_active = true
+WHERE name = 'diagnostico_red'
+  AND version = (SELECT max(version) FROM rule_sets WHERE name = 'diagnostico_red' AND content_yaml LIKE 'version: 3' || chr(10) || '%');
+
+INSERT INTO app_settings(key, value) VALUES ('agent_llm_extraction', 'true') ON CONFLICT DO NOTHING;
