@@ -1,0 +1,13 @@
+{
+  "ext": "pdf",
+  "title": "NIST SP 800-153: Guidelines for Securing Wireless Local Area Networks (WLANs)",
+  "publisher": "NIST",
+  "language": "en",
+  "license": "Dominio público (gobierno de EE. UU.)",
+  "document_type": "security_guideline",
+  "version": "2012-02",
+  "source_uri": "https://doi.org/10.6028/NIST.SP.800-153",
+  "fetched_from": "https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-153.pdf",
+  "fetched_at": "2026-11-03",
+  "bytes": 625526
+}

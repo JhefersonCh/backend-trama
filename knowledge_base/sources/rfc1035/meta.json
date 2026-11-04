@@ -1,0 +1,13 @@
+{
+  "ext": "txt",
+  "title": "RFC 1035: Domain Names - Implementation and Specification",
+  "publisher": "IETF",
+  "language": "en",
+  "license": "IETF Trust (RFC: copia permitida con aviso de copyright)",
+  "document_type": "standard",
+  "version": null,
+  "source_uri": "https://www.rfc-editor.org/rfc/rfc1035",
+  "fetched_from": "https://www.rfc-editor.org/rfc/rfc1035.txt",
+  "fetched_at": "2026-11-03",
+  "bytes": 122549
+}

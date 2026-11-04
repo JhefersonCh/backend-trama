@@ -1,0 +1,13 @@
+{
+  "ext": "txt",
+  "title": "RFC 3927: Dynamic Configuration of IPv4 Link-Local Addresses",
+  "publisher": "IETF",
+  "language": "en",
+  "license": "IETF Trust (RFC: copia permitida con aviso de copyright)",
+  "document_type": "standard",
+  "version": null,
+  "source_uri": "https://www.rfc-editor.org/rfc/rfc3927",
+  "fetched_from": "https://www.rfc-editor.org/rfc/rfc3927.txt",
+  "fetched_at": "2026-11-03",
+  "bytes": 83102
+}
