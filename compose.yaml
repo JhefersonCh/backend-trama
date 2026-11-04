@@ -1,0 +1,154 @@
+# TRAMA - docker compose. Run: docker compose --profile core up -d --build
+name: trama
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.0-pg17
+    profiles: [core]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trama}
+      POSTGRES_USER: ${POSTGRES_USER:-trama}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trama}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+
+  # One-shot: applies database/migrations/*.sql then database/seeds/*.sql not yet in schema_migrations.
+  migrate:
+    image: pgvector/pgvector:0.8.0-pg17
+    profiles: [core]
+    restart: "no"
+    entrypoint: ["/bin/sh", "/trama-db/migrate.sh"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trama}
+      POSTGRES_USER: ${POSTGRES_USER:-trama}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trama}
+      PGHOST: db
+    volumes:
+      - ./database:/trama-db:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 128m
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: [core]
+    networks:
+      default:
+      trama-net:
+        aliases: [backend]   # the frontend repo's nginx proxies to http://backend:8000
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-trama}:${POSTGRES_PASSWORD:-trama}@db:5432/${POSTGRES_DB:-trama}
+      SECRETS_DIR: /run/trama-secrets
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - trama-secrets:/run/trama-secrets
+      - media-data:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 768m
+
+  # --- Model runtimes: start EMPTY, models load on demand (the backend's model manager decides). ---
+  # Bring up ONE at a time on this laptop. Internal network only (default), no host ports.
+  llm-llamacpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-b12063   # >= v0.8.0 (LFM3 support), CPU build
+    profiles: [llm]
+    restart: unless-stopped
+    # Router mode (no -m): one server, models loaded/unloaded over HTTP. Max 2 loaded at once so the LLM (~1.2 GB)
+    # and the embedding model (~0.6 GB) used for per-turn RAG coexist: with 1, every turn evicted the LLM
+    # (reload + lost prompt cache). The backend ModelManager still enforces ram_budget_mb / strict_single_model.
+    command: >
+      --host 0.0.0.0 --port 8080
+      --models-max 2
+      --models-preset /etc/llama/models.ini
+      --models-dir /models
+    environment:
+      LLAMA_CACHE: /models/hf-cache
+    volumes:
+      - models-gguf:/models
+      - ./runtime/llamacpp-models.ini:/etc/llama/models.ini:ro
+    # ports: ["8081:8080"]   # debug only
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: 9g
+
+  llm-ollama:
+    image: ollama/ollama:0.40.14
+    profiles: [llm]
+    restart: unless-stopped
+    environment:
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 5m
+    volumes:
+      - models-ollama:/root/.ollama
+    # ports: ["11435:11434"]   # debug only
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    mem_limit: 9g
+
+  voice:
+    image: ghcr.io/speaches-ai/speaches:0.9.0-rc.3-cpu
+    profiles: [voice]
+    restart: unless-stopped
+    environment:
+      WHISPER__INFERENCE_DEVICE: cpu
+      WHISPER__COMPUTE_TYPE: int8
+      STT_MODEL_TTL: "300"     # idle seconds before STT/TTS models unload (-1 never, 0 immediately)
+      TTS_MODEL_TTL: "300"
+      VAD_MODEL_TTL: "300"
+      ENABLE_UI: "false"
+      LOG_LEVEL: info
+      HF_HUB_CACHE: /home/ubuntu/.cache/huggingface/hub
+    volumes:
+      - models-voice:/home/ubuntu/.cache/huggingface/hub
+    # ports: ["8001:8000"]   # debug only
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 4g
+volumes:
+  pgdata:
+  trama-secrets:
+  media-data:
+  models-gguf:
+  models-ollama:
+  models-voice:
+
+networks:
+  # Shared with the trama-frontend repo (declared there as external).
+  trama-net:
+    name: trama-net
