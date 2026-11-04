@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRAMA · {{ "Guía paso a paso" if kind == "guia" else "Informe del caso" }} {{ case_id }}</title>
+<style>
+  :root { --ink:#1d1a15; --muted:#6b655a; --line:#ddd6c8; --paper:#fbf9f4; --soft:#f2eee5;
+          --accent:#b46c00; --accent-soft:#fbefd9; --ok:#1f7a45; --warn:#b04f08; --bad:#b3261e;
+          --mono:'DejaVu Sans Mono',Menlo,Consolas,monospace; --sans:Helvetica,Arial,'DejaVu Sans',sans-serif; }
+  @page { size: A4; margin: 16mm 15mm 18mm; }
+  * { box-sizing: border-box; }
+  html { background:#e9e4d8; }
+  body { margin:0; font:13px/1.55 var(--sans); color:var(--ink); }
+  .sheet { max-width:790px; margin:18px auto; padding:34px 40px 40px; background:var(--paper); border:1px solid var(--line); }
+  header.top { display:flex; align-items:center; gap:14px; padding-bottom:14px; border-bottom:3px solid var(--accent); }
+  .logo { width:44px; height:44px; flex:none; }
+  .brand { font:700 22px/1 var(--sans); letter-spacing:.14em; }
+  .brand small { display:block; margin-top:5px; font:500 10px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .meta { margin-left:auto; text-align:right; font:11px/1.5 var(--mono); color:var(--muted); }
+  .meta b { color:var(--ink); }
+  h1 { margin:22px 0 4px; font-size:21px; line-height:1.2; }
+  h2 { margin:26px 0 10px; padding-bottom:5px; font:700 11px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border-bottom:1px solid var(--line); }
+  p { margin:6px 0; }
+  .lead { color:var(--muted); margin:0 0 6px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 0; }
+  .chip { padding:3px 10px; border:1px solid var(--line); border-radius:999px; background:var(--soft); font:11px var(--mono); }
+  .chip b { color:var(--accent); }
+  .box { padding:11px 14px; border:1px solid var(--line); border-left:4px solid var(--accent); background:var(--accent-soft); border-radius:4px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font:600 10px var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:4px 8px 4px 0; border-bottom:1px solid var(--line); }
+  td { padding:6px 8px 6px 0; border-bottom:1px solid var(--soft); vertical-align:top; }
+  td.mono, .mono { font-family:var(--mono); font-size:11.5px; }
+  .src { color:var(--muted); font-size:11.5px; }
+  .hyp { margin:0 0 11px; page-break-inside:avoid; }
+  .hyp .row { display:flex; justify-content:space-between; gap:12px; }
+  .hyp .name { font-weight:600; }
+  .hyp .st { font:11px var(--mono); color:var(--muted); white-space:nowrap; }
+  .bar { height:9px; margin-top:4px; background:var(--soft); border:1px solid var(--line); border-radius:5px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  .hyp.aceptada .bar i { background:var(--ok); }
+  .hyp.descartada { opacity:.55; }
+  .tl { list-style:none; margin:0; padding:0 0 0 14px; border-left:2px solid var(--line); }
+  .tl li { position:relative; margin:0 0 9px; padding-left:10px; page-break-inside:avoid; }
+  .tl li::before { content:""; position:absolute; left:-20px; top:6px; width:9px; height:9px; border-radius:50%; background:var(--paper); border:2px solid var(--accent); }
+  .tl li.ticket::before { border-color:var(--ok); } .tl li.foto::before { border-color:var(--warn); }
+  .tl time { display:block; font:10.5px var(--mono); color:var(--muted); }
+  ul.plain { margin:4px 0; padding-left:18px; }
+  .step { margin:0 0 14px; padding:10px 14px 10px 14px; border:1px solid var(--line); border-radius:6px; background:#fff; page-break-inside:avoid; }
+  .step h3 { margin:0 0 6px; font-size:14px; }
+  .step .n { display:inline-block; min-width:24px; margin-right:6px; padding:1px 0; text-align:center; font:700 12px var(--mono); color:var(--accent-soft); background:var(--accent); border-radius:4px; }
+  .step ol { margin:4px 0 0; padding-left:20px; } .step li { margin:3px 0; }
+  .done { font:11px var(--mono); color:var(--ok); }
+  .quote { margin:6px 0 0; padding:7px 11px; border-left:3px solid var(--line); background:var(--soft); color:#3d382f; font-size:12px; font-style:italic; }
+  .photo { display:flex; gap:14px; align-items:flex-start; margin-bottom:10px; }
+  .photo img { width:150px; border:1px solid var(--line); border-radius:4px; }
+  .topo { margin-top:6px; padding:8px; background:#fff; border:1px solid var(--line); border-radius:6px; }
+  .topo svg { width:100%; height:auto; display:block; }
+  footer { margin-top:30px; padding-top:10px; border-top:1px solid var(--line); font:10.5px/1.5 var(--mono); color:var(--muted); }
+  .led { display:inline-block; width:9px; height:9px; margin-right:5px; border-radius:50%; border:1px solid #0003; }
+  .led.verde{background:#2fa35f}.led.roja{background:#d33b2f}.led.naranja{background:#e8892b}.led.apagada{background:#cfc9bb}
+  @media print {
+    html { background:#fff; } .sheet { max-width:none; margin:0; padding:0; border:0; background:#fff; }
+    h2 { page-break-after:avoid; } a { color:inherit; text-decoration:none; }
+  }
+  @media (max-width:640px) { .sheet { padding:20px 16px; } header.top { flex-wrap:wrap; } .meta { margin:0; text-align:left; } }
+</style>
+</head>
+<body>
+<main class="sheet">
+  <header class="top">
+    <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+      <rect width="44" height="44" rx="10" fill="#1d1a15"/>
+      <g stroke="#ffb547" stroke-width="2.4" stroke-linecap="round" fill="none">
+        <path d="M9 14h26M9 22h26M9 30h26" opacity=".55"/><path d="M14 9v26M22 9v26M30 9v26" opacity=".55"/>
+        <path d="M9 30 L22 22 L35 14"/></g>
+      <circle cx="22" cy="22" r="3.2" fill="#ffb547"/>
+    </svg>
+    <div class="brand">TRAMA<small>Asistente de diagnóstico de red</small></div>
+    <div class="meta">Caso <b>{{ case_id }}</b><br>{% if opened %}Abierto {{ opened }}<br>{% endif %}Generado {{ generated }}</div>
+  </header>
+
+{% if kind == "guia" %}
+  <h1>Guía paso a paso</h1>
+  <p class="lead">Siga estos pasos en orden. Después de cada uno, revise si ya vuelve a navegar.</p>
+  {% for s in steps %}
+  <section class="step">
+    <h3><span class="n">{{ loop.index }}</span>{{ s.title }}{% if s.done %} <span class="done">· ya probado</span>{% endif %}</h3>
+    {% if s["for"] %}<div class="src">Para: {{ s["for"] }}</div>{% endif %}
+    <ol>{% for it in s["items"] %}<li>{{ it }}</li>{% endfor %}</ol>
+  </section>
+  {% endfor %}
+  <div class="box">Si después de estos pasos sigue sin conexión, escriba "quiero hablar con un técnico" en TRAMA y se abrirá un ticket con todo lo que ya probó.</div>
+{% else %}
+  <h1>Informe del caso</h1>
+  <p class="lead">{% if title %}{{ title }}. {% endif %}Resumen de lo que se encontró y de lo que se hizo.</p>
+  <div class="chips">
+    <span class="chip">Estado: <b>{{ state }}</b></span>
+    {% if verified %}<span class="chip">Resolución <b>verificada</b></span>{% endif %}
+    {% if top %}<span class="chip">Causa más probable: <b>{{ top.label }}</b></span>{% endif %}
+    {% if ticket %}<span class="chip">Ticket <b>{{ ticket.number }}</b></span>{% endif %}
+  </div>
+
+  <h2>Recomendación</h2>
+  <div class="box">{{ recommendation }}</div>
+
+  <h2>Qué creemos que pasa</h2>
+  {% for h in hypotheses %}
+  <div class="hyp {{ h.status }}">
+    <div class="row"><span class="name">{{ h.label }}</span><span class="st">{{ h.status_label }} · certeza {{ h.cf_text }}</span></div>
+    <div class="bar"><i style="width: {{ h.pct }}%"></i></div>
+  </div>
+  {% else %}<p class="src">Todavía no hay hipótesis: faltan datos.</p>{% endfor %}
+
+  <h2>Topología de su red</h2>
+  <div class="topo">{{ topology }}</div>
+  <p class="src">Cada tramo se colorea según lo que se midió o usted informó.</p>
+
+  <h2>Datos del caso (hechos y su origen)</h2>
+  {% if facts %}
+  <table><thead><tr><th>Dato</th><th>Origen</th><th>Confianza</th></tr></thead><tbody>
+  {% for f in facts %}<tr><td>{{ f.text | capitalize }}</td><td class="src">{{ f.source }}</td><td class="mono">{{ "%.0f"|format(f.certainty * 100) }} %</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="src">Aún no se registraron datos.</p>{% endif %}
+
+  {% if photos %}
+  <h2>Fotos analizadas</h2>
+  {% for p in photos %}<div class="photo">{% if p.src %}<img src="{{ p.src }}" alt="Foto del equipo">{% endif %}
+    <div>{% if p.device %}<p>Equipo: <b>{{ p.device }}</b></p>{% endif %}
+    {% for l in p.leds %}<div class="mono"><span class="led {{ l.color }}"></span>{{ l.label }}: {{ l.color }}{% if l.blink %} (parpadea){% endif %}</div>{% endfor %}
+    {% if p.error_text %}<p class="mono">Texto leído: {{ p.error_text }}</p>{% endif %}
+    {% if not p.device and not p.leds %}<p class="src">Foto adjunta sin análisis automático.</p>{% endif %}</div></div>{% endfor %}
+  {% endif %}
+
+  <h2>Pasos que ya se probaron</h2>
+  {% if tried %}<ul class="plain">{% for t in tried %}<li>{{ t }}</li>{% endfor %}</ul>{% else %}<p class="src">Todavía no se probó ningún paso.</p>{% endif %}
+
+  <h2>Línea de tiempo</h2>
+  <ol class="tl">{% for e in timeline %}<li class="{{ e.kind }}"><time>{{ e.at }}</time>{{ e.text }}</li>{% endfor %}</ol>
+
+  {% if ticket %}
+  <h2>Ticket y técnico</h2>
+  <table><tbody>
+    <tr><td class="src">Ticket</td><td class="mono"><b>{{ ticket.number }}</b> · {{ ticket.status }} · prioridad {{ ticket.priority }}</td></tr>
+    <tr><td class="src">Asunto</td><td>{{ ticket.title }}</td></tr>
+    <tr><td class="src">Abierto</td><td class="mono">{{ ticket.opened }}</td></tr>
+    <tr><td class="src">Técnico</td><td>{% if ticket.technician %}{{ ticket.technician }}{% if ticket.specialties %} <span class="src">({{ ticket.specialties | join(", ") }})</span>{% endif %}{% elif ticket.queued %}En cola, esperando un técnico disponible{% else %}Sin asignar todavía{% endif %}</td></tr>
+    {% if ticket.sla_due %}<tr><td class="src">Compromiso (SLA)</td><td class="mono">{{ ticket.sla_due }}{% if ticket.sla_remaining_h is not none %} · {% if ticket.sla_remaining_h >= 0 %}faltan {{ ticket.sla_remaining_h }} h{% else %}vencido hace {{ -ticket.sla_remaining_h }} h{% endif %}{% endif %}</td></tr>{% endif %}
+  </tbody></table>
+  {% endif %}
+
+  <h2>Fuentes consultadas</h2>
+  {% for s in sources %}
+  <div class="hyp"><b>{{ s.title }}</b>{% if s.section %} <span class="src">— {{ s.section }}</span>{% endif %}{% if s.is_synthetic %} <span class="src">(material de ejemplo)</span>{% endif %}
+    {% if s.excerpt %}<div class="quote">“{{ s.excerpt }}”</div>{% endif %}</div>
+  {% else %}<p class="src">En este caso no hizo falta consultar la base de conocimiento.</p>{% endfor %}
+
+  {% if steps %}
+  <h2>Guía rápida de los pasos sugeridos</h2>
+  {% for s in steps %}<section class="step"><h3><span class="n">{{ loop.index }}</span>{{ s.title }}{% if s.done %} <span class="done">· ya probado</span>{% endif %}</h3>
+    <ol>{% for it in s["items"] %}<li>{{ it }}</li>{% endfor %}</ol></section>{% endfor %}
+  {% endif %}
+{% endif %}
+
+  <footer>TRAMA · Documento generado automáticamente el {{ generated }}. No incluye datos de contacto.
+    Las hipótesis son estimaciones con un factor de certeza; no reemplazan la revisión de un técnico.</footer>
+</main>
+</body>
+</html>
