@@ -9,3 +9,6 @@ secrets/
 
 # Reference corpus: copyrighted/redistribution-sensitive raw text (re-fetch with scripts/fetch_sources.py)
 knowledge_base/sources/*/raw.*
+
+# Local tooling
+.lean-ctx/
