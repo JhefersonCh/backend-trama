@@ -24,15 +24,15 @@ TRAMA es un **sistema experto clásico**, con hechos, reglas e inferencia, combi
 
 ```mermaid
 flowchart LR
-  P[Percibir<br/>texto · voz · foto · captura] --> H[Hechos<br/>con factor de certeza]
-  H --> I[Inferencia<br/>encadenamiento hacia adelante]
-  I --> Hy[Hipótesis<br/>CF combinado estilo MYCIN]
-  Hy --> D{Decidir<br/>ganancia / costo}
-  D -->|preguntar| Q[Respuestas rápidas]
-  D -->|guiar| G[Checklist paso a paso]
-  D -->|verificar| V[¿Ya funciona?]
-  D -->|escalar| T[Ticket + técnico]
-  D --> X[Explicar el porqué<br/>reglas + fuentes]
+  P["Percibir<br/>texto · voz · foto · captura"] --> H["Hechos<br/>con factor de certeza"]
+  H --> I["Inferencia<br/>encadenamiento hacia adelante"]
+  I --> Hy["Hipótesis<br/>CF combinado estilo MYCIN"]
+  Hy --> D{"Decidir<br/>ganancia / costo"}
+  D -->|"preguntar"| Q["Respuestas rápidas"]
+  D -->|"guiar"| G["Checklist paso a paso"]
+  D -->|"verificar"| V["¿Ya funciona?"]
+  D -->|"escalar"| T["Ticket + técnico"]
+  D --> X["Explicar el porqué<br/>reglas + fuentes"]
 ```
 
 | Pieza | Qué hace | Dónde |
@@ -60,12 +60,12 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  FE[frontend · nginx] -- REST / WebSocket --> BE[backend · FastAPI]
-  BE --> DB[(PostgreSQL 17<br/>+ pgvector)]
-  BE --> MM[Gestor de modelos<br/>presupuesto de RAM]
-  MM --> LL[llama.cpp<br/>modo router]
-  MM --> SP[speaches<br/>STT · TTS]
-  MM --> EXT[API externa<br/>compatible con OpenAI]
+  FE["frontend · nginx"] -- "REST / WebSocket" --> BE["backend · FastAPI"]
+  BE --> DB[("PostgreSQL 17<br/>+ pgvector")]
+  BE --> MM["Gestor de modelos<br/>presupuesto de RAM"]
+  MM --> LL["llama.cpp<br/>modo router"]
+  MM --> SP["speaches<br/>STT · TTS"]
+  MM --> EXT["API externa<br/>compatible con OpenAI"]
 ```
 
 El código está organizado **por dominio**, con puertos y adaptadores donde hay infraestructura de por medio:
